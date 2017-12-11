@@ -1,0 +1,162 @@
+---
+title: "Logistic regression"
+author: "Mathew Yang"
+date: "November 27, 2017"
+output: html_document
+---
+
+```{r}
+library(caret)
+library(pROC)
+library(ggplot2)
+#Load data
+wdbc = read.csv("~/BIOE530/project/data/wdbc.data", header= FALSE)
+#only the means
+wdbc.means = wdbc[2:12]
+```
+
+```{r}
+#PCA
+pca.model = prcomp(wdbc.means[,2:11], scale. = T) #std.dev scaled to 1, normalizes variables.
+summary(pca.model)
+biplot(pca.model, scale = 0)                
+```
+
+
+#Logisitic Regression
+```{r}
+#Logistic regression on means.
+#Train and test on same dataset.
+cancer.fit = glm(V2~V3 + V4 + V5 + V6 + V7 + V8 + V9 + V10 + V11 + V12, 
+                 data=wdbc.means, 
+                 family= "binomial")
+summary(cancer.fit)
+```
+
+V4,V6,V7,V10 showed significance. This was training and testing on the same dataset. 
+```{r}
+#Gives probabilities that the observation is a malignant tumor. Probability close to 1 is malignant, 0 is benign.
+cancer.probs = predict(cancer.fit, type = "response")
+
+#Create a vector of 569 Benign elements
+cancer.pred=rep("B",569)
+
+#Transform all the ones greater than 0.5 to Malignant.
+cancer.pred[cancer.probs>0.5]="M"
+
+```
+Confusion Matrix
+```{r}
+table(cancer.pred, wdbc$V2)
+```
+
+Training error rate is 1 - (347+193)/569 = 0.051, which means that the model was capable of correctly guessing M or B almost 95% of the time. This needs to be retested via crossvalidation or LOOCV.
+
+#Model Fitting with all 10 PC's and Cross-Validation
+
+```{r}
+#10-fold cross validation
+ctrl <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
+
+#create dataframe for running model
+train.data = data.frame(tumor = wdbc.means$V2, pca.model$x)
+
+mod_fit <- train(tumor~., 
+                 data=train.data, method="glm", family="binomial",
+                 trControl = ctrl)
+```
+
+```{r}
+pred = predict(mod_fit, type = "prob")
+actual = as.numeric(wdbc.means$V2)-1
+roc.log10 <- roc(actual, pred$B)
+
+#Turn into roc object for ROC later
+roc.cancer = roc(actual, cancer.probs)
+```
+
+```{r}
+# Plot ROC
+plot.roc(roc.log10, xlab = "False Positive Rate", ylab="True Positive Rate", main="ROC Curve", print.auc=TRUE)
+```
+
+#Model Fitting with 3 PCA and Cross-Validation
+
+```{r}
+#PCA
+pca.model3 = prcomp(wdbc.means[,2:11], scale. = T, rank. = 3) #std.dev scaled to 1, normalizes variables.
+```
+
+```{r}
+#10-fold cross validation
+ctrl <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
+
+#create dataframe for running model
+train.data = data.frame(tumor = wdbc.means$V2, pca.model3$x)
+
+mod_fit <- train(tumor~., 
+                 data=train.data, method="glm", family="binomial",
+                 trControl = ctrl)
+```
+
+```{r}
+# 1=tumor, 0=benign
+pred = predict(mod_fit, type = "prob")
+actual = as.numeric(wdbc.means$V2)-1
+roc.log <- roc(actual, pred$M)
+```
+
+```{r}
+# Plot ROC
+plot.roc(roc.log, 
+         xlab = "False Positive Rate (1-Specificity)", 
+         ylab="True Positive Rate (Sensitivity)", 
+         main="ROC Curve", 
+         print.auc=TRUE)
+```
+
+#Combine Log and SVM ROC plots
+
+```{r}
+#load SVM ROC data
+ROC_3 = read.table("~/BIOE530/project/data/ROC_3_pca.txt", header= T)
+ROC_10 = read.table("~/BIOE530/project/data/ROC_10.txt", header = T)
+```
+
+```{r}
+#Turn log data into ROC data points
+log.sens = as.numeric(roc.log$sensitivities)
+log.spec = as.numeric(roc.log$specificities)
+
+roc.sens10 = as.numeric(roc.cancer$sensitivities)
+roc.spec10 = as.numeric(roc.cancer$specificities)
+```
+
+```{r}
+plot(1-log.spec, log.sens, 
+    type = "l", lwd = 2,
+    xlab = "False Positive Rate (1-Specificity)", 
+    ylab="True Positive Rate (Sensitivity)", 
+    main="ROC Curve (3 PCs)",
+    col="blue")
+lines(ROC_3[,1],ROC_3[,2], col="red", lwd=2)
+
+```
+
+```{r}
+plot(1-roc.spec10, roc.sens10, 
+     type="l", lwd=2,
+    xlab = "False Positive Rate (1-Specificity)", 
+    ylab="True Positive Rate (Sensitivity)", 
+    main="ROC Curve (10 Features)", 
+    col="blue")
+lines(ROC_10[,1],ROC_10[,2], col="red", lwd=2)
+```
+
+```{r}
+#plot glm
+ggplot(mod_fit, aes(x=pred$B, y=pred$M)) + geom_point() + 
+stat_smooth(method="glm", family="binomial", se=FALSE)
+```
+
+
