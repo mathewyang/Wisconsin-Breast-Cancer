@@ -1,7 +1,6 @@
 ---
-title: "Untitled"
+title: "Exploratory Data Analysis"
 author: "Mathew Yang"
-date: "November 13, 2017"
 output: html_document
 ---
 
@@ -14,9 +13,10 @@ library(GGally)
 #setwd("C:\\Users\\matt\\Documents\\BIOE530\\project\\data")
 ```
 
+I will be using the Wisconsin Breast Cancer dataset for exploratory data analysis. The goal of this is to gain a deeper understanding of the data I will be working with. 
+
 ```{r}
-#wdbc = read.csv("~/BIOE530/project/data/wdbc.data", header= FALSE)
-setwd("~/Documents/530Project/data")
+setwd("C:\\Users\\me\\Documents\\Wisconsin-Breast-Cancer\\Wisconsin-Breast-Cancer\\data")
 wdbc = read.csv("wdbc.data", header= FALSE)
 ```
 There are 569 patients in this dataset with 32 features. Features 1 and 2 are the ID number and breast cancer diagnosis for the patient. The remaining 30 features are computed values from images of cell nuclei. The mean, standard error, and max values were computed for each of the 10 real-valued features, resulting in a total of 30.

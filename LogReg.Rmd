@@ -1,36 +1,37 @@
 ---
 title: "Logistic regression"
 author: "Mathew Yang"
-date: "November 27, 2017"
 output: html_document
 ---
-
+I will be running a logistic regression model on this dataset to classify the tumor cells. 
 ```{r}
 library(caret)
 library(pROC)
 #Load data
 wdbc = read.csv("data/wdbc.data", header= FALSE)
 #only the means
-wdbc.means = wdbc[2:12]
+#wdbc.means = wdbc[2:12]
 ```
+#Principal Component Analysis
 
 ```{r}
 #PCA
-pca.model = prcomp(wdbc.means[,2:11])
+pca.model = prcomp(wdbc[,3:32])
 summary(pca.model)
-biplot(pca.model, scale = 0)                
+biplot(pca.model, scale = TRUE)                
 ```
-PCA reveals that there are 3 principal components that make up almost the entirety of the variance (V6, V5, V4). We will use these 3 PCs in our model.
+PCA reveals that there are 2 cell features that contribute heavily to the dataset's variance: V6 (mean cell area) and V26 (max cell area). The first 2 principal components (PC) account for over 99% of the data variance, so we will opt to use just these two PCs.
 
-#Logistic Regression
+#Logistic Regression Model
+
+Here we will train and test on the same dataset. This is inadvisable but I'd like to compare the results to a cross-validated model.
 ```{r}
 #Logistic regression on means.
 #Train and test on same dataset.
-cancer.fit = glm(V2 ~ pca.model$x[,1] + pca.model$x[,2] + pca.model$x[,3], data=wdbc.means, family= binomial)
+cancer.fit = glm(V2 ~ pca.model$x[,1] + pca.model$x[,2], data=wdbc.means, family= binomial)
 summary(cancer.fit)
 ```
 
-V4,V6,V7,V10 showed significance. This was training and testing on the same dataset. 
 ```{r}
 #Gives probabilities that the observation is a malignant tumor. Probability close to 1 is malignant, 0 is benign.
 cancer.probs = predict(cancer.fit, type = "response")
@@ -46,14 +47,15 @@ Confusion Matrix
 table(cancer.pred, wdbc$V2)
 ```
 
-Training error rate is 1 - (334+181)/569 = ??, which means that the model was capable of correctly guessing M or B almost X?% of the time. This needs to be retested via crossvalidation or LOOCV.
+Training error rate is 1 - (345+186)/569 = 0.067, which means that the model was capable of correctly guessing M or B almost 93.3% of the time. Next I will retest via crossvalidation or LOOCV (leave-one-out cross-validation).
+
 ```{r}
 # Different PCA method
-preProc <- preProcess(wdbc.means[2:11], method="pca", pcaComp = 3)
-trainPC <- predict(preProc, wdbc.means[2:11])
-testPC <- predict(preProc, wdbc.means[2:11])
+preProc <- preProcess(wdbc[2:32], method="pca", pcaComp = 2)
+trainPC <- predict(preProc, wdbc[2:32])
+testPC <- predict(preProc, wdbc[2:32])
 # add the diagnosis into the trainPC data
-trainPC <- data.frame(trainPC, wdbc.means$V2)
+trainPC <- data.frame(trainPC, wdbc$V2)
 ```
 
 ```{r}
@@ -61,7 +63,7 @@ trainPC <- data.frame(trainPC, wdbc.means$V2)
 ctrl <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
 
 #Perform logistic regression on cross-validated data
-mod_fit <- train(wdbc.means.V2~ ., 
+mod_fit <- train(wdbc.V2~ ., 
                  data=trainPC, preProc="pca", method="glm", family="binomial",
                  trControl = ctrl)
 summary(mod_fit)
@@ -69,7 +71,7 @@ summary(mod_fit)
 
 ```{r}
 pred = predict(mod_fit, type = "prob")
-actual = as.numeric(wdbc.means$V2)-1
+actual = as.numeric(wdbc$V2)-1
 roc.log <- roc(actual, pred$B)
 ```
 
@@ -78,9 +80,5 @@ roc.log <- roc(actual, pred$B)
 plot.roc(roc.log, xlab = "False Positive Rate", ylab="True Positive Rate", main="ROC Curve", print.auc=TRUE)
 #Get AUC
 auc(roc.log)
-```
-
-```{r}
-
 ```
 
