@@ -1,0 +1,43 @@
+---
+title: "KNN"
+author: "Mathew Yang"
+output: html_document
+---
+
+#K-Nearest Neighbors
+
+I will be using KNN to classify the tumor cells.
+```{r}
+library(class)
+wdbc = read.csv("data/wdbc.data", header= FALSE)
+```
+
+We know that the cell area skews our dataset so we will scale it here to minimize biases.
+```{r}
+#Scales data by subtracting mean, then dividing by standard deviation.
+scaled.wdbc = scale(wdbc[,3:32])
+```
+
+I will split the 569 observations into a training and testing set.
+```{r}
+#Matrix of predictors associated with training data
+train.X = scaled.wdbc[-(1:200),]
+
+#Matrix of predictors with test
+test.X = scaled.wdbc[1:200,]
+
+#Vector of class labels for training/testing
+train.Y = wdbc$V2[-(1:200)]
+test.Y = wdbc$V2[1:200]
+```
+
+```{r}
+#Run the KNN model
+set.seed(1)
+knn.pred = knn(train.X, test.X, train.Y, k=1)
+
+pred.result = mean(test.Y!=knn.pred) #Our error rate
+print(paste("The error rate of the KNN model is ", pred.result))
+```
+
+KNN resulted in a 95.5% accuracy rate.

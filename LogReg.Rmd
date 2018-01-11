@@ -9,8 +9,6 @@ library(caret)
 library(pROC)
 #Load data
 wdbc = read.csv("data/wdbc.data", header= FALSE)
-#only the means
-#wdbc.means = wdbc[2:12]
 ```
 #Principal Component Analysis
 
@@ -28,7 +26,7 @@ Here we will train and test on the same dataset. This is inadvisable but I'd lik
 ```{r}
 #Logistic regression on means.
 #Train and test on same dataset.
-cancer.fit = glm(V2 ~ pca.model$x[,1] + pca.model$x[,2], data=wdbc.means, family= binomial)
+cancer.fit = glm(V2 ~ pca.model$x[,1] + pca.model$x[,2], data=wdbc, family= binomial)
 summary(cancer.fit)
 ```
 
@@ -47,24 +45,17 @@ Confusion Matrix
 table(cancer.pred, wdbc$V2)
 ```
 
-Training error rate is 1 - (345+186)/569 = 0.067, which means that the model was capable of correctly guessing M or B almost 93.3% of the time. Next I will retest via crossvalidation or LOOCV (leave-one-out cross-validation).
+Training error rate is 1 - (345+186)/569 = 0.067, which means that the model was capable of correctly guessing M or B almost 93.3% of the time. Next I will retest via crossvalidation or 10-fold LOOCV (leave-one-out cross-validation).
 
 ```{r}
-# Different PCA method
-preProc <- preProcess(wdbc[2:32], method="pca", pcaComp = 2)
-trainPC <- predict(preProc, wdbc[2:32])
-testPC <- predict(preProc, wdbc[2:32])
-# add the diagnosis into the trainPC data
-trainPC <- data.frame(trainPC, wdbc$V2)
-```
+#10-fold parameters
+ctrl = trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
 
-```{r}
-#10-fold cross validation
-ctrl <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
-
-#Perform logistic regression on cross-validated data
-mod_fit <- train(wdbc.V2~ ., 
-                 data=trainPC, preProc="pca", method="glm", family="binomial",
+#Perform logistic regression on 10-fold cross-validated data
+mod_fit = train(V2~ ., 
+                 data=wdbc, 
+                 method="glm",
+                 family = "binomial",
                  trControl = ctrl)
 summary(mod_fit)
 ```
@@ -72,9 +63,10 @@ summary(mod_fit)
 ```{r}
 pred = predict(mod_fit, type = "prob")
 actual = as.numeric(wdbc$V2)-1
-roc.log <- roc(actual, pred$B)
+roc.log = roc(actual, pred$B)
 ```
 
+An ROC curve is commonly used to analyze and compare the performance of models. The area under the ROC curve (AUC) provides a quantitative assessment of ???
 ```{r}
 # Plot ROC
 plot.roc(roc.log, xlab = "False Positive Rate", ylab="True Positive Rate", main="ROC Curve", print.auc=TRUE)
